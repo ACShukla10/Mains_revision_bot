@@ -21,6 +21,19 @@ def clean_option(text):
     return text[:97] + "..." if len(text) > MAX_OPTION_LENGTH else text
 
 
+def get_entity_word(sheet_title):
+    title_lower = sheet_title.lower()
+
+    if "article" in title_lower:
+        return "Article"
+    if "judgement" in title_lower or "judgment" in title_lower:
+        return "Judgement"
+    if "committee" in title_lower:
+        return "Committee"
+
+    return "Title"
+
+
 def get_all_worksheets():
     scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
     creds = Credentials.from_service_account_info(GOOGLE_CREDS, scopes=scopes)
@@ -36,13 +49,13 @@ def safe_sample(series, n):
     return random.sample(values, n)
 
 
-def generate_generic_questions(df):
+def generate_questions(df, entity_word):
     questions = []
 
     if df.shape[1] < 2:
         return []
 
-    col1 = df.columns[0]  # Title column
+    col1 = df.columns[0]  # Name column
     col2 = df.columns[1]  # Description column
 
     df = df.sample(frac=1).reset_index(drop=True)
@@ -50,26 +63,26 @@ def generate_generic_questions(df):
     if df[col1].nunique() < 4:
         return []
 
-    # First 5 → Title → Choose correct description
+    # First 5 → Entity → Choose correct description
     for _, row in df.head(5).iterrows():
         correct = row[col2]
         wrong = safe_sample(df[df[col1] != row[col1]][col2], 3)
         options = random.sample([correct] + wrong, len(wrong) + 1)
 
         questions.append({
-            "question": f"{row[col1]} corresponds to which description?",
+            "question": f"{entity_word} '{row[col1]}' relates to which summary?",
             "options": [clean_option(o) for o in options],
             "answer": options.index(clean_option(correct))
         })
 
-    # Next 5 → Description → Choose correct title
+    # Next 5 → Description → Choose correct entity
     for _, row in df.tail(5).iterrows():
         correct = row[col1]
         wrong = safe_sample(df[df[col1] != correct][col1], 3)
         options = random.sample([correct] + wrong, len(wrong) + 1)
 
         questions.append({
-            "question": f"Which title matches:\n\"{clean_option(row[col2])}\"?",
+            "question": f"Which {entity_word} matches:\n\"{clean_option(row[col2])}\"?",
             "options": [clean_option(o) for o in options],
             "answer": options.index(correct)
         })
@@ -106,7 +119,9 @@ async def main():
         if df.empty:
             continue
 
-        questions = generate_generic_questions(df)
+        entity_word = get_entity_word(ws.title)
+
+        questions = generate_questions(df, entity_word)
 
         if not questions:
             continue
