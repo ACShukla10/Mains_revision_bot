@@ -2,7 +2,7 @@ name: Mains Quiz Bot
 
 on:
   schedule:
-    - cron: "30 10 * * *"   # 16:00 IST daily
+    - cron: "45 11 * * *"   # 16:00 IST daily
   workflow_dispatch:
 
 jobs:
