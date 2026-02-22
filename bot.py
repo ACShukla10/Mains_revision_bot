@@ -55,8 +55,8 @@ def generate_questions(df, entity_word):
     if df.shape[1] < 2:
         return []
 
-    col1 = df.columns[0]  # Name column
-    col2 = df.columns[1]  # Description column
+    col1 = df.columns[0]
+    col2 = df.columns[1]
 
     df = df.sample(frac=1).reset_index(drop=True)
 
@@ -67,24 +67,34 @@ def generate_questions(df, entity_word):
     for _, row in df.head(5).iterrows():
         correct = row[col2]
         wrong = safe_sample(df[df[col1] != row[col1]][col2], 3)
-        options = random.sample([correct] + wrong, len(wrong) + 1)
+
+        raw_options = [correct] + wrong
+        random.shuffle(raw_options)
+
+        correct_index = raw_options.index(correct)
+        cleaned_options = [clean_option(o) for o in raw_options]
 
         questions.append({
             "question": f"{entity_word} '{row[col1]}' relates to which summary?",
-            "options": [clean_option(o) for o in options],
-            "answer": options.index(clean_option(correct))
+            "options": cleaned_options,
+            "answer": correct_index
         })
 
     # Next 5 → Description → Choose correct entity
     for _, row in df.tail(5).iterrows():
         correct = row[col1]
         wrong = safe_sample(df[df[col1] != correct][col1], 3)
-        options = random.sample([correct] + wrong, len(wrong) + 1)
+
+        raw_options = [correct] + wrong
+        random.shuffle(raw_options)
+
+        correct_index = raw_options.index(correct)
+        cleaned_options = [clean_option(o) for o in raw_options]
 
         questions.append({
             "question": f"Which {entity_word} matches:\n\"{clean_option(row[col2])}\"?",
-            "options": [clean_option(o) for o in options],
-            "answer": options.index(correct)
+            "options": cleaned_options,
+            "answer": correct_index
         })
 
     return questions
@@ -120,7 +130,6 @@ async def main():
             continue
 
         entity_word = get_entity_word(ws.title)
-
         questions = generate_questions(df, entity_word)
 
         if not questions:
